@@ -1,0 +1,6 @@
+[package]
+name = "taxo"
+version = "0.1.0"
+authors = ["Judson <nyarly@gmail.com>"]
+
+[dependencies]
