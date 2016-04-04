@@ -4,3 +4,6 @@ version = "0.1.0"
 authors = ["Judson <nyarly@gmail.com>"]
 
 [dependencies]
+docopt = "~0.6.78"
+glob = "*"
+regex = "~0.1"
