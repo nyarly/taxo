@@ -13,68 +13,26 @@ mod taxo {
   use std::fs::File;
   use std::io::BufReader;
 
-  struct Rules {
-    rules_list: Vec<Rule>
+  struct Rules<'a> {
+    rules_list: Vec<Rule<'a>>
   }
 
-  enum Rule {
-    GlobRule,
-    RegexpRule,
+  enum Rule<'a> {
+    Glob(GlobRule<'a>),
+    Regex(RegexRule<'a>)
   }
-
-  fn return_rule() -> Rule {
-    GlobRule{value: "something", rule: glob::Pattern::new("").unwrap(), opts: glob::MatchOptions::new()} as Rule
-  }
-
-  impl Rule {
-    fn parse(line: String) -> Result<Rule, String> {
-      let chars = line.chars();
-      let sep = chars.peekable().nth(1);
-
-      let parts = match sep {
-        Some(ch) => line.split(ch),
-        None => return Err(format!("Rule '{}' is too short - try something like 'g * good'", line))
-      };
-
-      let kind = match parts.next() {
-        Some("g") | Some("G") | Some("f") | Some("F") => "g",
-        Some("r") | Some("R")                         => "r",
-        None                                          => return Err(format!("Rule '{}' too short - no kind (rRgGfF)", line)),
-        Some(k)                                       => return Err(format!("unrecognized rule kind {} in {}", k, line)),
-      };
-
-      let rule = match parts.next() {
-        None => return Err(format!("Rule '{}' too short", line)),
-        r @ Some(_) => r,
-      };
-
-      let value = match parts.next() {
-        None => return Err(format!("Rule '{}' too short", line)),
-        Some(v) => v,
-      };
-
-      match (kind, rule, parts.next()) {
-        ("g" , Some(r)     , None)       => GlobRule::new(  r     , None , value) as Rule ,
-        ("g" , r @ Some(_) , Some(last)) => GlobRule::new(  value , r    , last) as Rule ,
-        ("r" , Some(r)     , None)       => RegexpRule::new(r     , None , value) as Rule,
-        ("r" , r @ Some(_) , Some(last)) => RegexpRule::new(value , r    , last) as Rule ,
-        _                 => Err(format!("Rule couldn't be parsed {}", line)),
-      }
-
-    }
-  }
-
-  trait Matchable {
-    fn matches(&self, &str) -> bool;
-  }
-
-  use glob;
 
   struct GlobRule<'a> {
     rule: glob::Pattern,
     opts: glob::MatchOptions,
     value: &'a str,
   }
+
+  struct RegexRule<'a> {
+    rule: &'a regex::Regex,
+    value: &'a str,
+  }
+  use glob;
 
   impl<'a> GlobRule<'a> {
     fn new(rulestr: &str, opts_opt: Option<&str>, value: &str) -> Result<GlobRule<'a>,String> {
@@ -104,21 +62,8 @@ mod taxo {
     }
   }
 
-  impl<'a> Matchable for GlobRule<'a> {
-    fn matches(&self, name: &str) -> bool {
-      self.rule.match_with(name, self.opts)
-    }
-  }
-
-  use regex;
-
-  struct RegexpRule<'a> {
-    rule: &'a regex::Regex,
-    value: &'a str,
-  }
-
-  impl<'a> RegexpRule<'a> {
-    fn new(rulestr: &str, optstr: &str, value: &str) -> Result<RegexpRule<'a>,String> {
+  impl<'a> RegexRule<'a> {
+    fn new(rulestr: &str, optstr: &str, value: &str) -> Result<RegexRule<'a>,String> {
       if optstr.len() > 0 {
         rulestr = format!("?({}){}", optstr, rulestr)
       }
@@ -127,12 +72,62 @@ mod taxo {
         Ok(re) => re,
       };
 
-      Ok(RegexpRule{rule: re, value: value})
+      Ok(RegexRule{rule: re, value: value})
     }
   }
 
-  impl Rules {
-    fn parse(source_file: str) -> Result<Rules, &'static str> {
+
+  impl<'a> Rule<'a> {
+    fn parse(line: String) -> Result<Rule<'a>, String> {
+      let chars = line.chars();
+      let sep = chars.peekable().nth(1);
+
+      let parts = match sep {
+        Some(ch) => line.split(ch),
+        None => return Err(format!("Rule '{}' is too short - try something like 'g * good'", line))
+      };
+
+      let kind = match parts.next() {
+        Some("g") | Some("G") | Some("f") | Some("F") => "g",
+        Some("r") | Some("R")                         => "r",
+        None                                          => return Err(format!("Rule '{}' too short - no kind (rRgGfF)", line)),
+        Some(k)                                       => return Err(format!("unrecognized rule kind {} in {}", k, line)),
+      };
+
+      let rule = match parts.next() {
+        None => return Err(format!("Rule '{}' too short", line)),
+        r @ Some(_) => r,
+      };
+
+      let value = match parts.next() {
+        None => return Err(format!("Rule '{}' too short", line)),
+        Some(v) => v,
+      };
+
+      match (kind, rule, parts.next()) {
+        ("g" , Some(r)     , None)       => GlobRule::new(  r     , None , value),
+        ("g" , r @ Some(_) , Some(last)) => GlobRule::new(  value , r    , last),
+        ("r" , Some(r)     , None)       => RegexRule::new(r     , None , value),
+        ("r" , r @ Some(_) , Some(last)) => RegexRule::new(value , r    , last),
+        _                 => Err(format!("Rule couldn't be parsed {}", line)),
+      }
+    }
+  }
+
+  trait Matchable {
+    fn matches(&self, &str) -> bool;
+  }
+
+  impl<'a> Matchable for GlobRule<'a> {
+    fn matches(&self, name: &str) -> bool {
+      self.rule.match_with(name, self.opts)
+    }
+  }
+
+  use regex;
+
+  impl<'a> Rules<'a> {
+    fn parse(source_file: str) -> Result<Rules<'a>, &'static str> {
       let rules_list = vec![];
 
       let f = try!(File::open("foo.txt"));
