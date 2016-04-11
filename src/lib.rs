@@ -1,102 +1,119 @@
 use std::result::Result;
 
-#[cfg(test)] mod test {
-    #[test]
-    fn it_works() {
-    }
+#[cfg(test)]mod test {
+  #[test]
+  fn it_works() {}
 }
 
 extern crate glob;
 extern crate regex;
 mod taxo {
 
-  use std::fs::File;
   use std::io::BufReader;
+  use std::io::BufRead;
+  use std::fs::File;
 
-  struct Rules<'a> {
-    rules_list: Vec<Rule<'a>>
+  struct Rules {
+    rules_list: Vec<Rule>,
   }
 
-  enum Rule<'a> {
-    Glob(GlobRule<'a>),
-    Regex(RegexRule<'a>)
+  enum Rule {
+    Glob(GlobRule),
+    Regex(RegexRule),
   }
 
-  struct GlobRule<'a> {
+  struct GlobRule {
     rule: glob::Pattern,
     opts: glob::MatchOptions,
-    value: &'a str,
+    value: String,
   }
 
-  struct RegexRule<'a> {
-    rule: &'a regex::Regex,
-    value: &'a str,
+  struct RegexRule {
+    rule: regex::Regex,
+    value: String,
   }
   use glob;
+  use std::error::Error;
 
-  impl<'a> GlobRule<'a> {
-    fn new(rulestr: &str, opts_opt: Option<&str>, value: &str) -> Result<GlobRule<'a>,String> {
+  impl GlobRule {
+    fn new(rulestr: &str, opts_opt: Option<&str>, value: String) -> Result<Rule, String> {
       let pat = match glob::Pattern::new(rulestr) {
-        PatternErr => return Err(format!("couldn't parse {} as a glob rule", rulestr)),
+        Err(err) => {
+          return Err(format!("couldn't parse {} as a glob rule: {}",
+                             rulestr,
+                             err.description()))
+        }
         Ok(p) => p,
       };
 
-      let opts = glob::MatchOptions::new();
+      let mut opts = glob::MatchOptions::new();
       opts.require_literal_leading_dot = true;
 
       match opts_opt {
-        Some(optstr) => for ch in optstr.chars() {
-          match ch {
-            "h" | "d" => opts.require_literal_leading_dot = false,
-            "s" => opts.require_literal_separator = false,
-            "S" => opts.require_literal_separator = true,
-            "c" => opts.case_sensitive = true,
-            "C" => opts.case_sensitive = false,
-            unk => return Err(format!("Unrecognized glob rule option: {}", unk)),
+        Some(optstr) => {
+          for ch in optstr.chars() {
+            match ch {
+              'h' | 'd' => opts.require_literal_leading_dot = false,
+              's' => opts.require_literal_separator = false,
+              'S' => opts.require_literal_separator = true,
+              'c' => opts.case_sensitive = true,
+              'C' => opts.case_sensitive = false,
+              unk => return Err(format!("Unrecognized glob rule option: {}", unk)),
+            }
           }
-        },
+        }
         None => {}
       }
 
-      return Ok(GlobRule{rule: pat, opts: opts, value: value})
+      return Ok(Rule::Glob(GlobRule {
+        rule: pat,
+        opts: opts,
+        value: value,
+      }));
     }
   }
 
-  impl<'a> RegexRule<'a> {
-    fn new(rulestr: &str, optstr: &str, value: &str) -> Result<RegexRule<'a>,String> {
-      if optstr.len() > 0 {
+  impl RegexRule {
+    fn new(mut rulestr: String, options: Option<&str>, value: String) -> Result<Rule, String> {
+      let re: &regex::Regex;
+
+      if let Some(optstr) = options {
         rulestr = format!("?({}){}", optstr, rulestr)
-      }
-      let re = match regex::Regex.new(rulestr) {
-        Err => return Err(format!("Couldn't format '{}' as a regex", rulestr)),
+      };
+
+      let re = match regex::Regex::new(&rulestr) {
+        Err(_) => return Err(format!("Couldn't format '{}' as a regex", rulestr)),
         Ok(re) => re,
       };
 
-      Ok(RegexRule{rule: re, value: value})
+      Ok(Rule::Regex(RegexRule {
+        rule: re,
+        value: value,
+      }))
     }
   }
 
 
-  impl<'a> Rule<'a> {
-    fn parse(line: String) -> Result<Rule<'a>, String> {
-      let chars = line.chars();
-      let sep = chars.peekable().nth(1);
-
-      let parts = match sep {
-        Some(ch) => line.split(ch),
-        None => return Err(format!("Rule '{}' is too short - try something like 'g * good'", line))
+  impl Rule {
+    fn parse(line: String) -> Result<Rule, String> {
+      let mut parts = match line.chars().nth(1) {
+        Some(ch) => line.split(ch).map(|s| String::from(s)),
+        None => {
+          return Err(format!("Rule '{}' is too short - try something like 'g * good'",
+                             line))
+        }
       };
 
       let kind = match parts.next() {
         Some("g") | Some("G") | Some("f") | Some("F") => "g",
-        Some("r") | Some("R")                         => "r",
-        None                                          => return Err(format!("Rule '{}' too short - no kind (rRgGfF)", line)),
-        Some(k)                                       => return Err(format!("unrecognized rule kind {} in {}", k, line)),
+        Some("r") | Some("R") => "r",
+        None => return Err(format!("Rule '{}' too short - no kind (rRgGfF)", line)),
+        Some(k) => return Err(format!("unrecognized rule kind {} in {}", k, line)),
       };
 
       let rule = match parts.next() {
         None => return Err(format!("Rule '{}' too short", line)),
-        r @ Some(_) => r,
+        Some(r) => r,
       };
 
       let value = match parts.next() {
@@ -104,12 +121,12 @@ mod taxo {
         Some(v) => v,
       };
 
-      match (kind, rule, parts.next()) {
-        ("g" , Some(r)     , None)       => GlobRule::new(  r     , None , value),
-        ("g" , r @ Some(_) , Some(last)) => GlobRule::new(  value , r    , last),
-        ("r" , Some(r)     , None)       => RegexRule::new(r     , None , value),
-        ("r" , r @ Some(_) , Some(last)) => RegexRule::new(value , r    , last),
-        _                 => Err(format!("Rule couldn't be parsed {}", line)),
+      match (kind, parts.next()) {
+        ("g", None) => GlobRule::new(rule, None, value),
+        ("g", Some(last)) => GlobRule::new(value, Some(rule), last),
+        ("r", None) => RegexRule::new(String::from(rule), None, value),
+        ("r", Some(last)) => RegexRule::new(String::from(value), Some(rule), last),
+        _ => Err(format!("Rule couldn't be parsed {}", line)),
       }
     }
   }
@@ -118,27 +135,39 @@ mod taxo {
     fn matches(&self, &str) -> bool;
   }
 
-  impl<'a> Matchable for GlobRule<'a> {
+  impl Matchable for GlobRule {
     fn matches(&self, name: &str) -> bool {
-      self.rule.match_with(name, self.opts)
+      self.rule.matches_with(name, &self.opts)
     }
   }
 
   use regex;
 
-  impl<'a> Rules<'a> {
-    fn parse(source_file: str) -> Result<Rules<'a>, &'static str> {
-      let rules_list = vec![];
+  impl Rules {
+    fn parse(source_file: &str) -> Result<Rules, String> {
+      let mut rules_list = vec![];
 
-      let f = try!(File::open("foo.txt"));
+      let f = match File::open("foo.txt") {
+        Ok(file) => file,
+        err @ Err(_) => return Err(format!("couldn't open file")),
+      };
       let mut reader = BufReader::new(f);
 
-      let rules = reader.lines().map(|line| line.and_then(|l| Rule::parse(l)));
-      if let err = rules.find(|r| r.not_ok()) {
-        err
-      } else {
-        Ok(Rules{ rules_list: rules.collect() })
+      let rules = reader.lines().map(|line| {
+        match line {
+          Ok(l) => Rule::parse(String::from(l)),
+          Err(e) => return Err(format!("io error while reading file {}", e.description())),
+        }
+      });
+
+      for ruleRes in rules {
+        match ruleRes {
+          Err(e) => return Err(format!("parse error: {}", e)),
+          Ok(rule) => rules_list.push(rule),
+        }
       }
+
+      Ok(Rules { rules_list: rules_list })
     }
   }
 }
