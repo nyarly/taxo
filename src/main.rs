@@ -17,5 +17,5 @@ fn main() {
     .unwrap_or_else(|er| er.exit());
 
   let rules: Rules = Rules::parse(args.arg_rulepath);
-  println!(rules.matched_value(args.arg_filename))
+  println!("{}", rules.matched_value(args.arg_filename))
 }

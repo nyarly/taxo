@@ -36,8 +36,8 @@ mod taxo {
   use std::error::Error;
 
   impl GlobRule {
-    fn new(rulestr: &str, opts_opt: Option<&str>, value: String) -> Result<Rule, String> {
-      let pat = match glob::Pattern::new(rulestr) {
+    fn new(rulestr: String, opts_opt: Option<String>, value: String) -> Result<Rule, String> {
+      let pat = match glob::Pattern::new(&rulestr) {
         Err(err) => {
           return Err(format!("couldn't parse {} as a glob rule: {}",
                              rulestr,
@@ -74,7 +74,7 @@ mod taxo {
   }
 
   impl RegexRule {
-    fn new(mut rulestr: String, options: Option<&str>, value: String) -> Result<Rule, String> {
+    fn new(mut rulestr: String, options: Option<String>, value: String) -> Result<Rule, String> {
       let re: &regex::Regex;
 
       if let Some(optstr) = options {
@@ -94,6 +94,7 @@ mod taxo {
   }
 
 
+  use std::ops::Deref;
   impl Rule {
     fn parse(line: String) -> Result<Rule, String> {
       let mut parts = match line.chars().nth(1) {
@@ -105,10 +106,12 @@ mod taxo {
       };
 
       let kind = match parts.next() {
-        Some("g") | Some("G") | Some("f") | Some("F") => "g",
-        Some("r") | Some("R") => "r",
+        Some(s) => match s.deref() {
+          "g" | "G" | "f" | "F" => 'g',
+          "r" | "R" => 'r',
+          k => return Err(format!("unrecognized rule kind {} in {}", k, line)),
+        },
         None => return Err(format!("Rule '{}' too short - no kind (rRgGfF)", line)),
-        Some(k) => return Err(format!("unrecognized rule kind {} in {}", k, line)),
       };
 
       let rule = match parts.next() {
@@ -122,10 +125,10 @@ mod taxo {
       };
 
       match (kind, parts.next()) {
-        ("g", None) => GlobRule::new(rule, None, value),
-        ("g", Some(last)) => GlobRule::new(value, Some(rule), last),
-        ("r", None) => RegexRule::new(String::from(rule), None, value),
-        ("r", Some(last)) => RegexRule::new(String::from(value), Some(rule), last),
+        ('g', None) => GlobRule::new(rule, None, value),
+        ('g', Some(last)) => GlobRule::new(value, Some(rule), last),
+        ('r', None) => RegexRule::new(String::from(rule), None, value),
+        ('r', Some(last)) => RegexRule::new(String::from(value), Some(rule), last),
         _ => Err(format!("Rule couldn't be parsed {}", line)),
       }
     }
