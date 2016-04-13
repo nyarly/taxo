@@ -2,8 +2,10 @@
 name = "taxo"
 version = "0.1.0"
 authors = ["Judson <nyarly@gmail.com>"]
+publish = false
 
 [dependencies]
 docopt = "~0.6.78"
+rustc-serialize = "0.3"
 glob = "*"
 regex = "~0.1"
