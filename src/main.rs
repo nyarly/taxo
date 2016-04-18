@@ -21,7 +21,7 @@ fn main() {
                      .unwrap_or_else(|er| er.exit());
 
   match taxo::parse_rulefile(args.arg_rulepath) {
-    Ok(rules) => println!("{}", rules.matched_value(args.arg_filename)),
+    Ok(rules) => println!("{}", rules.matched_value(args.arg_filename).expect("")),
     Err(desc) => println!("{}", desc),
   }
 }
