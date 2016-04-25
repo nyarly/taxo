@@ -1,5 +1,5 @@
 use std::error::Error;
-use super::rule::Rule;
+use super::rule::{self, Rule};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use super::Result;
@@ -25,7 +25,7 @@ pub fn parse_buffer<T: BufRead>(reader: T) -> Result<Rules> {
 
   let rules = reader.lines().map(|line| {
     match line {
-      Ok(l) => if l != "" { Rule::parse(String::from(l)).map(|r| Some(r)) } else { Ok(None) },
+      Ok(l) => if l != "" { rule::parse(String::from(l)).map(|r| Some(r)) } else { Ok(None) },
       Err(e) => return Err(format!("io error while reading file {}", e.description())),
     }
   });
