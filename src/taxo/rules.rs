@@ -1,13 +1,12 @@
 use std::error::Error;
-use super::rule::{self, Rule};
+use super::rule;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use super::Result;
 use super::Matchable;
-use std::ops::Deref;
 
 pub struct Rules {
-  pub rules_list: Vec<Rule>,
+  pub rules_list: Vec<Box<Matchable>>,
 }
 
 pub fn parse_file(source_file: String) -> Result<Rules> {
@@ -42,20 +41,10 @@ pub fn parse_buffer<T: BufRead>(reader: T) -> Result<Rules> {
 }
 
 impl Rules {
-  pub fn matched_value(&self, against: String) -> Option<&str> {
+  pub fn matched_value(&self, against: String) -> Option<String> {
     self.rules_list
         .iter()
-        .find(|&rule| {
-          match rule {
-            &Rule::Glob(ref gr) => gr.matches(&against),
-            &Rule::Regex(ref rr) => rr.matches(&against),
-          }
-        })
-        .map(|rule| {
-          match rule {
-            &Rule::Glob(ref gr) => gr.value.deref(),
-            &Rule::Regex(ref rr) => rr.value.deref(),
-          }
-        })
+        .find(|&rule| rule.matches(&against))
+        .map(|rule| rule.value())
   }
 }

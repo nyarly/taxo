@@ -7,7 +7,7 @@ pub struct Rule {
 
 extern crate regex;
 impl Rule {
-  pub fn new(mut rulestr: String, options: Option<String>, value: String) -> Result<super::Rule> {
+  pub fn new(mut rulestr: String, options: Option<String>, value: String) -> Result<Box<Rule>> {
     if let Some(optstr) = options {
       rulestr = format!("?({}){}", optstr, rulestr)
     };
@@ -17,7 +17,7 @@ impl Rule {
       Ok(re) => re,
     };
 
-    Ok(super::Rule::Regex(Rule {
+    Ok(Box::new(Rule {
       rule: re,
       value: value,
     }))
@@ -27,5 +27,9 @@ impl Rule {
 impl Matchable for Rule {
   fn matches(&self, name: &str) -> bool {
     self.rule.is_match(name)
+  }
+
+  fn value(&self) -> String {
+    self.value.clone()
   }
 }

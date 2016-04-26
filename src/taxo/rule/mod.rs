@@ -3,16 +3,12 @@ use super::Result;
 mod glob;
 mod regex;
 
+use super::Matchable;
 use self::glob::Rule as GlobRule;
 use self::regex::Rule as RegexRule;
 
-pub enum Rule {
-  Glob(GlobRule),
-  Regex(RegexRule),
-}
-
 use std::ops::Deref;
-pub fn parse(line: String) -> Result<Rule> {
+pub fn parse(line: String) -> Result<Box<Matchable>> {
   let mut parts = match line.chars().nth(1) {
     Some(ch) => line.split(ch).map(|s| String::from(s)),
     None => {
@@ -43,10 +39,13 @@ pub fn parse(line: String) -> Result<Rule> {
   };
 
   match (kind, parts.next()) {
-    ('g', None) => GlobRule::new(rule, None, value),
-    ('g', Some(last)) => GlobRule::new(value, Some(rule), last),
-    ('r', None) => RegexRule::new(String::from(rule), None, value),
-    ('r', Some(last)) => RegexRule::new(String::from(value), Some(rule), last),
+    ('g', None) => GlobRule::new(rule, None, value).map(|rr| rr as Box<Matchable>),
+    ('g', Some(last)) => GlobRule::new(value, Some(rule), last).map(|rr| rr as Box<Matchable>),
+    ('r', None) => RegexRule::new(String::from(rule), None, value).map(|rr| rr as Box<Matchable>),
+    ('r', Some(last)) => {
+      RegexRule::new(String::from(value), Some(rule), last).map(|rr| rr as Box<Matchable>)
+    }
     _ => Err(format!("Rule couldn't be parsed {}", line)),
   }
+
 }

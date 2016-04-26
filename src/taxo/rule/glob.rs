@@ -11,7 +11,7 @@ pub struct Rule {
 
 extern crate glob;
 impl Rule {
-  pub fn new(rulestr: String, opts_opt: Option<String>, value: String) -> Result<super::Rule> {
+  pub fn new(rulestr: String, opts_opt: Option<String>, value: String) -> Result<Box<Rule>> {
     let pat = match glob::Pattern::new(&rulestr) {
       Err(err) => {
         return Err(format!("couldn't parse {} as a glob rule: {}",
@@ -38,18 +38,22 @@ impl Rule {
         }
       }
       None => {}
-    }
+    };
 
-    return Ok(super::Rule::Glob(Rule {
+    Ok(Box::new(Rule {
       rule: pat,
       opts: opts,
       value: value,
-    }));
+    }))
   }
 }
 
 impl Matchable for Rule {
   fn matches(&self, name: &str) -> bool {
     self.rule.matches_with(name, &self.opts)
+  }
+
+  fn value(&self) -> String {
+    self.value.clone()
   }
 }

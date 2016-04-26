@@ -7,18 +7,13 @@ fn it_works() {}
 
 #[test]
 fn glob_parses() {
-  match rule::parse("g **/*.rs good".to_string()).unwrap() {
-    Rule::Glob(glob_rule) => assert_eq!(glob_rule.value, "good"),
-    _ => panic!(),
-  }
+  assert_eq!("good",
+             rule::parse("g **/*.rs good".to_string()).unwrap().value())
 }
 
 #[test]
 fn glob_matches() {
-  let glob = match rule::parse("g **/yes.rs good".to_string()).unwrap() {
-    Rule::Glob(glob_rule) => glob_rule,
-    _ => panic!(),
-  };
+  let glob = rule::parse("g **/yes.rs good".to_string()).unwrap();
 
   assert!(glob.matches("somewhere/yes.rs"));
   assert!(glob.matches("yes.rs"));
@@ -28,10 +23,7 @@ fn glob_matches() {
 
 #[test]
 fn regex_matches() {
-  let re = match rule::parse("r .*yes.rs$ good".to_string()).unwrap() {
-    Rule::Regex(rule) => rule,
-    _ => panic!("didn't parse"),
-  };
+  let re = rule::parse("r .*yes.rs$ good".to_string()).unwrap();
 
   assert!(re.matches("somewhere/yes.rs"));
   assert!(re.matches("yes.rs"));
