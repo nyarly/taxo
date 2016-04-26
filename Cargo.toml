@@ -1,8 +1,11 @@
 [package]
 name = "taxo"
+description = "Categorizes paths based on glob or regexp rules."
+repository = "https://git.lrdesign.com/judson/taxo"
+readme = "README.md"
+license = "MIT"
 version = "0.1.0"
 authors = ["Judson <nyarly@gmail.com>"]
-publish = false
 
 [dependencies]
 docopt = "~0.6.78"
